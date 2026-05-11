@@ -75,11 +75,11 @@ if __name__ == "__main__":
         
         print(f"   Train set: {len(X_train_clean)} match | Test set: {len(X_test_clean)} match")
         
-        print("Addestramento Rete Neurale Baseline (Dati Puliti)...")
+        print("Addestramento Rete Neurale Baseline...")
         baseline_acc = train_and_evaluate_mlp(X_train_clean, y_train_clean, X_test_clean, y_test_clean)
         
         print(f"\nAccuracy Baseline = {baseline_acc:.4f}")
         
         
     except FileNotFoundError:
-        print(f"\nERRORE: Non trovo il file {dataset_path}")
+        print(f"\nERRORE: Non presente il file {dataset_path}")
