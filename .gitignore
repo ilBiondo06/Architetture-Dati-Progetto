@@ -1,0 +1,6 @@
+# Report generati da Pandas Profiling / ydata-profiling
+*.html
+confronto_atp_matches.html
+
+# Cartelle temporanee di output (opzionale)
+outputs/
