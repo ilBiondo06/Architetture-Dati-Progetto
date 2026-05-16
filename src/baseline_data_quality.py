@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import numpy as np
 from sklearn.neural_network import MLPClassifier
@@ -6,6 +8,8 @@ from sklearn.metrics import accuracy_score
 import warnings
 
 warnings.filterwarnings('ignore')
+
+_BASELINE_ACCURACY = None
 
 # COSTANTI E FEATURES, usate per l'allenamento e la valutazione del modello
 FEATURES = [
@@ -59,27 +63,54 @@ def train_and_evaluate_mlp(X_train, y_train, X_test, y_test):
     y_pred = mlp.predict(X_test_scaled)
     return accuracy_score(y_test, y_pred)
 
+def get_or_compute_baseline(dataset_path):
+    """
+    Funzione per gestire la baseline tramite un file di testo semplice (.txt).
+    Se il file 'baseline.txt' esiste su disco, legge il valore istantaneamente.
+    Altrimenti, avvia il training della baseline, crea il file e memorizza il valore.
+    """
+    global _BASELINE_ACCURACY
+    
+    if _BASELINE_ACCURACY is not None:
+        return _BASELINE_ACCURACY
+        
+    # Calcolo il percorso in cui salvare il file di testo
+    base_folder = os.path.dirname(os.path.abspath(__file__))
+    cache_file = os.path.join(base_folder, "baseline.txt")
+    
+    # Controllo se il file di testo esiste già su disco 
+    if os.path.exists(cache_file):
+        with open(cache_file, "r") as f:
+            _BASELINE_ACCURACY = float(f.read().strip())
+            return _BASELINE_ACCURACY
+
+    # Se il file non esiste, calcolo il valore
+    X_train_clean, y_train_clean, X_test_clean, y_test_clean = get_train_test_split(dataset_path)
+    _BASELINE_ACCURACY = train_and_evaluate_mlp(X_train_clean, y_train_clean, X_test_clean, y_test_clean)
+    
+    # Scrivo il valore all'interno del file di testo
+    with open(cache_file, "w") as f:
+        f.write(str(_BASELINE_ACCURACY))
+    print(f"Baseline calcolata e salvata in: {cache_file}")
+    
+    return _BASELINE_ACCURACY
+
 
 
 # ESECUZIONE PRINCIPALE
 
 if __name__ == "__main__":
-    print("--- INIZIO PIPELINE DATA QUALITY ---")
+    print("-- INIZIO PIPELINE DATA QUALITY --")
     
-    # Assicurati che il percorso del file sia corretto!
-    dataset_path = "../data/dataset_ml_ready.csv" 
+    # Calcolo dinamico del path rispetto alla posizione dello script (cartella 'src')
+    base_folder = os.path.dirname(os.path.abspath(__file__))
+    dataset_path = os.path.join(base_folder, "..", "data", "dataset_ml_ready.csv") 
     
     try:
-        print("Caricamento dati e split temporale...")
-        X_train_clean, y_train_clean, X_test_clean, y_test_clean = get_train_test_split(dataset_path)
-        
-        print(f"   Train set: {len(X_train_clean)} match | Test set: {len(X_test_clean)} match")
-        
-        print("Addestramento Rete Neurale Baseline...")
-        baseline_acc = train_and_evaluate_mlp(X_train_clean, y_train_clean, X_test_clean, y_test_clean)
-        
+        baseline_acc = get_or_compute_baseline(dataset_path)
         print(f"\nAccuracy Baseline = {baseline_acc:.4f}")
         
-        
     except FileNotFoundError:
-        print(f"\nERRORE: Non presente il file {dataset_path}")
+        print(f"\nERRORE: file {dataset_path} non trovato")
+    except Exception as e:
+        print(f"\nErrore durante l'esecuzione: {e}")
