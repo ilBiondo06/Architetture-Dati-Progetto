@@ -41,11 +41,14 @@ def sporca_elo_last(X, percentage, lag=25):
     return X_dirty
 
 if __name__ == "__main__":
-    print("--- INIZIO PIPELINE DATA QUALITY: ESPERIMENTI ---")
+    print("--- INIZIO PIPELINE DATA QUALITY: ESPERIMENTO TIMELINESS ---")
     
-    # Calcolo dinamico del path per il dataset
+    # Definizione dei nuovi percorsi clean e dirty
     base_folder = os.path.dirname(os.path.abspath(__file__))
-    dataset_path = os.path.join(base_folder, "..", "data", "dataset_ml_ready.csv") 
+    clean_dir = os.path.join(base_folder, "..", "data", "clean")
+    dirty_dir = os.path.join(base_folder, "..", "data", "dirty")
+    
+    dataset_path = os.path.join(clean_dir, "dataset_ml_ready.csv") 
     
     try:
         baseline_acc = get_or_compute_baseline(dataset_path)
@@ -53,39 +56,48 @@ if __name__ == "__main__":
         
         X_train_clean, y_train_clean, X_test_clean, y_test_clean = get_train_test_split(dataset_path)
         
-        percentuali = [0.05, 0.10, 0.20, 0.30, 0.50]  # Percentuali da testare 
-        N_RUNS = 10  # Numero di esperimenti 
+        percentuali = [0.05, 0.10, 0.20, 0.30, 0.50]  
+        N_RUNS = 10  
+        LAG_VALUE = 25  
         
         risultati_media = []
-        risultati_std = [] # Deviazione standard 
+        risultati_std = [] 
         
-        print(f"--- AVVIO LOOP DI DEGRADO (TIMELINESS - ELO LAG 25) | {N_RUNS} RUNS PER STEP ---")
+        print(f"--- AVVIO LOOP DI DEGRADO (TIMELINESS - ELO LAG {LAG_VALUE}) | {N_RUNS} RUNS PER STEP ---")
         
         for p in percentuali:
             if p == 0.0:
                 media_acc = baseline_acc
                 std_acc = 0.0
             else:
-                run_accuracies = [] # Qui salviamo i risultati delle singole run
+                run_accuracies = [] 
                 
                 for run in tqdm(range(N_RUNS), desc=f"Progresso esperimento con degrado {p*100:0.0f}%", colour='green'):
                     
-                    X_stale = sporca_elo_last(X_train_clean, percentage=p, lag=10)
+                    # Generazione del rumore
+                    X_stale = sporca_elo_last(X_train_clean, percentage=p, lag=LAG_VALUE)
+                    
+                    # Salvataggio snapshot (solo alla prima iterazione)
+                    if run == 0:
+                        df_to_save = X_stale.copy()
+                        df_to_save['target'] = y_train_clean # Ricongiungiamo il target per PyDeequ
+                        
+                        dirty_filename = f"dataset_timeliness_lag{LAG_VALUE}_{int(p*100)}pct.csv"
+                        df_to_save.to_csv(os.path.join(dirty_dir, dirty_filename), index=False)
+                    
+                    # Training e valutazione
                     acc = train_and_evaluate_mlp(X_stale, y_train_clean, X_test_clean, y_test_clean)
                     run_accuracies.append(acc)
                 
-                # Statistiche finali per questa percentuale
                 media_acc = np.mean(run_accuracies)
                 std_acc = np.std(run_accuracies)
                 
                 diff = baseline_acc - media_acc
                 print(f"  -> Accuracy Media: {media_acc:.4f} ± {std_acc:.4f} | Perdita: {(diff*100):.2f}%")
             
-            # Salviamo per il report finale
             risultati_media.append(media_acc)
             risultati_std.append(std_acc)
             
-        # 4. Tabella riassuntiva dei log
         print("\n" + "="*60)
         print("REPORT FINALE ESPERIMENTO (MEDIA SU 10 RUNS): TIMELINESS")
         print("="*60)

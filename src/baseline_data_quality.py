@@ -104,7 +104,7 @@ if __name__ == "__main__":
     
     # Calcolo dinamico del path rispetto alla posizione dello script (cartella 'src')
     base_folder = os.path.dirname(os.path.abspath(__file__))
-    dataset_path = os.path.join(base_folder, "..", "data", "dataset_ml_ready.csv") 
+    dataset_path = os.path.join(base_folder, "..", "data","clean", "dataset_ml_ready.csv") 
     
     try:
         baseline_acc = get_or_compute_baseline(dataset_path)
