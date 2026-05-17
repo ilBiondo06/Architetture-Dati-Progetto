@@ -43,7 +43,7 @@ def sporca_elo_last(X, percentage, lag=25):
 if __name__ == "__main__":
     print("--- INIZIO PIPELINE DATA QUALITY: ESPERIMENTI ---")
     
-    # Calcolo dinamico del path per il dataset (stessa logica robusta usata in baseline)
+    # Calcolo dinamico del path per il dataset
     base_folder = os.path.dirname(os.path.abspath(__file__))
     dataset_path = os.path.join(base_folder, "..", "data", "dataset_ml_ready.csv") 
     
