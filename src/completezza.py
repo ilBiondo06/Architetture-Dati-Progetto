@@ -1,9 +1,8 @@
+import os
 import numpy as np
 import pandas as pd
-
-from baseline_data_quality import train_and_evaluate_mlp, get_train_test_split
-
-
+from tqdm import tqdm
+from baseline_data_quality import train_and_evaluate_mlp, get_train_test_split, get_or_compute_baseline
 
 def introduci_missing_values(X, percentage):
     """
@@ -11,14 +10,13 @@ def introduci_missing_values(X, percentage):
     - percentage: percentuale di celle totali da svuotare.
     """
     X_dirty = X.copy()
-    # Creiamo una maschera booleana casuale
     mask = np.random.rand(*X_dirty.shape) < percentage
     X_dirty[mask] = np.nan
     
     print(f"Svuotato il {percentage*100}% delle celle totali del dataset.")
     return X_dirty
 
-def sporca_elo_last(X, percentage, lag=10):
+def sporca_elo_last(X, percentage, lag=25):
     """
     Simula un ritardo nell'aggiornamento dell'Elo.
     Sostituisce il valore attuale con quello di 'lag' posizioni precedenti.
@@ -31,58 +29,84 @@ def sporca_elo_last(X, percentage, lag=10):
     elo_cols = [col for col in X_dirty.columns if 'elo' in col.lower()]
     
     for col in elo_cols:
-        # Creiamo una serie con i valori traslati (quelli di 10 righe fa)
-        # shift(lag) sposta i dati, bfill() riempie i primi 10 buchi con il primo valore disponibile
+        # Spostiamo i dati indietro del valore di lag e riempiamo i primi buchi in alto
         stale_values = X_dirty[col].shift(lag).bfill()
         
-        # Scegliamo gli indici da sporcare
+        # Scegliamo gli indici casuali da sporcare
         idx = np.random.choice(X_dirty.index, n_changes, replace=False)
         
-        # Sostituiamo i valori attuali con quelli vecchi
+        # Sostituiamo i valori reali con quelli obsoleti
         X_dirty.loc[idx, col] = stale_values.loc[idx]
         
-    print(f"Simulato ritardo di {lag} partite per l'Elo ({percentage*100}% dei record).")
     return X_dirty
 
 if __name__ == "__main__":
-    print("--- INIZIO PIPELINE DATA QUALITY ---")
-    dataset_path = "progetto/dataset_ml_ready.csv" 
+    print("--- INIZIO PIPELINE DATA QUALITY: ESPERIMENTO TIMELINESS ---")
+    
+    # Definizione dei nuovi percorsi clean e dirty
+    base_folder = os.path.dirname(os.path.abspath(__file__))
+    clean_dir = os.path.join(base_folder, "..", "data", "clean")
+    dirty_dir = os.path.join(base_folder, "..", "data", "dirty")
+    
+    dataset_path = os.path.join(clean_dir, "dataset_ml_ready.csv") 
     
     try:
-        # 1. Ottieni i dati puliti già divisi e filtrati per FEATURES
+        baseline_acc = get_or_compute_baseline(dataset_path)
+        print(f"Accuratezza Baseline di riferimento: {baseline_acc:.4f}\n")
+        
         X_train_clean, y_train_clean, X_test_clean, y_test_clean = get_train_test_split(dataset_path)
         
+        percentuali = [0.05, 0.10, 0.20, 0.30, 0.50]  
+        N_RUNS = 10  
+        LAG_VALUE = 25  
         
-        # 3. VALUTAZIONE BASELINE (Dati Puliti)
-        print("\n--- TEST 1: Modello su Dati Puliti ---")
-        acc_clean = train_and_evaluate_mlp(X_train_clean, y_train_clean, X_test_clean, y_test_clean)
-        print(f"Accuracy Baseline: {acc_clean:.4f}")
-
-        """
-        # --- VALORI MANCANTI (Completeness) ---
-        print("\n--- TEST 4: Modello con Valori Mancanti (5%) ---")
-        # Introduciamo i NaN
-        X_missing = introduci_missing_values(X_train_clean, 0.05)
-        # IMPORTANTE: Il MLP non accetta NaN, quindi li riempiamo con la media
-        X_train_dirty = X_missing.fillna(X_train_clean.mean())
-        """
-        # ---  ELO NON AGGIORNATO (Lag 10) ---
-        print("\n--- TEST 5: Modello con Elo vecchio di 10 partite ---")
-        X_stale = sporca_elo_last(X_train_clean, 0.1, lag=10)
-        acc_stale = train_and_evaluate_mlp(X_stale, y_train_clean, X_test_clean, y_test_clean)
+        risultati_media = []
+        risultati_std = [] 
         
-        print(f"Accuracy (Elo Stale): {acc_stale:.4f}")
-        print(f"Perdita: {((acc_clean - acc_stale)*100):.2f}%")
-
-
-        # 4. VALUTAZIONE ROBUSTEZZA (Dati Sporchi)
-        print("\n--- TEST 2: Modello su Dati Sporchi ---")
-        acc_dirty = train_and_evaluate_mlp(X_stale, y_train_clean, X_test_clean, y_test_clean)
-        print(f"Accuracy con Accuracy Error (5%): {acc_dirty:.4f}")
+        print(f"--- AVVIO LOOP DI DEGRADO (TIMELINESS - ELO LAG {LAG_VALUE}) | {N_RUNS} RUNS PER STEP ---")
         
-        # 5. CONFRONTO
-        diff = acc_clean - acc_dirty
-        print(f"\nIl modello ha perso lo {diff*100:.2f}% di accuratezza a causa del rumore.")
-
+        for p in percentuali:
+            if p == 0.0:
+                media_acc = baseline_acc
+                std_acc = 0.0
+            else:
+                run_accuracies = [] 
+                
+                for run in tqdm(range(N_RUNS), desc=f"Progresso esperimento con degrado {p*100:0.0f}%", colour='green'):
+                    
+                    # Generazione del rumore
+                    X_stale = sporca_elo_last(X_train_clean, percentage=p, lag=LAG_VALUE)
+                    
+                    # Salvataggio snapshot (solo alla prima iterazione)
+                    if run == 0:
+                        df_to_save = X_stale.copy()
+                        df_to_save['target'] = y_train_clean # Ricongiungiamo il target per PyDeequ
+                        
+                        dirty_filename = f"dataset_timeliness_lag{LAG_VALUE}_{int(p*100)}pct.csv"
+                        df_to_save.to_csv(os.path.join(dirty_dir, dirty_filename), index=False)
+                    
+                    # Training e valutazione
+                    acc = train_and_evaluate_mlp(X_stale, y_train_clean, X_test_clean, y_test_clean)
+                    run_accuracies.append(acc)
+                
+                media_acc = np.mean(run_accuracies)
+                std_acc = np.std(run_accuracies)
+                
+                diff = baseline_acc - media_acc
+                print(f"  -> Accuracy Media: {media_acc:.4f} ± {std_acc:.4f} | Perdita: {(diff*100):.2f}%")
+            
+            risultati_media.append(media_acc)
+            risultati_std.append(std_acc)
+            
+        print("\n" + "="*60)
+        print("REPORT FINALE ESPERIMENTO (MEDIA SU 10 RUNS): TIMELINESS")
+        print("="*60)
+        for i, p in enumerate(percentuali):
+            taglio_performance = (baseline_acc - risultati_media[i]) * 100
+            print(f"Degrado {p*100:02.0f}% | Test Accuracy: {risultati_media[i]:.4f} ± {risultati_std[i]:.4f} | Delta: -{taglio_performance:.2f}%")
+        print("="*60)
+        
+    except FileNotFoundError:
+        print(f"\nERRORE: file {dataset_path} non trovato")
     except Exception as e:
-        print(f"Errore durante l'esecuzione: {e}")
+        print(f"\nErrore durante l'esecuzione: {e}")
