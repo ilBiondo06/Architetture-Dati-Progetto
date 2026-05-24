@@ -1,3 +1,4 @@
+import json
 import os
 
 import pandas as pd
@@ -42,7 +43,7 @@ def get_train_test_split(file_path):
     return X_train, y_train, X_test, y_test
 
 # Funzione per addestrare la MLP e valutare l'accuracy
-def train_and_evaluate_mlp(X_train, y_train, X_test, y_test):
+def train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=False):
     """Scala i dati, addestra la MLP e ritorna l'accuracy."""
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
@@ -60,40 +61,57 @@ def train_and_evaluate_mlp(X_train, y_train, X_test, y_test):
     )
     mlp.fit(X_train_scaled, y_train)
     
-    y_pred = mlp.predict(X_test_scaled)
-    return accuracy_score(y_test, y_pred)
+    acc = mlp.score(X_test_scaled, y_test)
+        
+        # LA MAGIA È QUI:
+    if return_model:
+        return acc, mlp
+    else:
+        return acc
 
 def get_or_compute_baseline(dataset_path):
     """
-    Funzione per gestire la baseline tramite un file di testo semplice (.txt).
-    Se il file 'baseline.txt' esiste su disco, legge il valore istantaneamente.
-    Altrimenti, avvia il training della baseline, crea il file e memorizza il valore.
+    Gestisce la persistenza della baseline su disco usando un file JSON.
+    Salva l'accuratezza, la loss curve e le epoche di convergenza.
     """
-    global _BASELINE_ACCURACY
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    cache_path = os.path.join(base_dir, "baseline_metrics.json")
     
-    if _BASELINE_ACCURACY is not None:
-        return _BASELINE_ACCURACY
+    if os.path.exists(cache_path):
+        with open(cache_path, "r") as f:
+            data = json.load(f)
+        return data["accuracy"]
+    
+    print("Calcolo della Baseline e salvataggio delle metriche di addestramento...")
+    X_train, y_train, X_test, y_test = get_train_test_split(dataset_path)
+    
+    acc, mlp = train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=True)
+    
+    # Struttura dei metadati da salvare
+    cache_data = {
+        "accuracy": float(acc),
+        "n_iter": int(mlp.n_iter_),
+        "loss_curve": [float(x) for x in mlp.loss_curve_]
+    }
+    
+    # Salviamo il file JSON nella cartella 'src'
+    with open(cache_path, "w") as f:
+        json.dump(cache_data, f, indent=4)
         
-    # Calcolo il percorso in cui salvare il file di testo
-    base_folder = os.path.dirname(os.path.abspath(__file__))
-    cache_file = os.path.join(base_folder, "baseline.txt")
-    
-    # Controllo se il file di testo esiste già su disco 
-    if os.path.exists(cache_file):
-        with open(cache_file, "r") as f:
-            _BASELINE_ACCURACY = float(f.read().strip())
-            return _BASELINE_ACCURACY
+    return acc
 
-    # Se il file non esiste, calcolo il valore
-    X_train_clean, y_train_clean, X_test_clean, y_test_clean = get_train_test_split(dataset_path)
-    _BASELINE_ACCURACY = train_and_evaluate_mlp(X_train_clean, y_train_clean, X_test_clean, y_test_clean)
+
+def load_baseline_cache():
+    """
+    Funzione helper per caricare l'intero dizionario delle metriche salvate in cache.
+    """
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    cache_path = os.path.join(base_dir, "baseline_metrics.json")
     
-    # Scrivo il valore all'interno del file di testo
-    with open(cache_file, "w") as f:
-        f.write(str(_BASELINE_ACCURACY))
-    print(f"Baseline calcolata e salvata in: {cache_file}")
-    
-    return _BASELINE_ACCURACY
+    if os.path.exists(cache_path):
+        with open(cache_path, "r") as f:
+            return json.load(f)
+    return None
 
 
 
