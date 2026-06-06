@@ -1,0 +1,7 @@
+Dataset,Righe Totali,Righe Perse,% Righe Perse,N. Col. Perse,Data Max Rilevata,Shift Media Età,Esempi Col. Perse
+CLEANED_BASE,74853,0,0.0,0,N/D,Riferimento Base,Nessuna
+lag25_10pct,68846,6007,8.03,48,Colonna ELIMINATA,-26.29 anni,"l_bpSaved, match_num, l_2ndWon"
+lag25_20pct,68846,6007,8.03,48,Colonna ELIMINATA,-26.29 anni,"l_bpSaved, match_num, l_2ndWon"
+lag25_30pct,68846,6007,8.03,48,Colonna ELIMINATA,-26.29 anni,"l_bpSaved, match_num, l_2ndWon"
+lag25_50pct,68846,6007,8.03,48,Colonna ELIMINATA,-26.29 anni,"l_bpSaved, match_num, l_2ndWon"
+lag25_5pct,68846,6007,8.03,48,Colonna ELIMINATA,-26.29 anni,"l_bpSaved, match_num, l_2ndWon"
