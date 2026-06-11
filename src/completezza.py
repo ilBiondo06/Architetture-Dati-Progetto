@@ -143,45 +143,36 @@ if __name__ == "__main__":
             risultati['Lag_25']['media'].append(m); risultati['Lag_25']['std'].append(s)
             print(f"  -> Accuracy: {m:.4f} ± {s:.4f} | Delta: -{(baseline_acc - m)*100:.2f}%\n")
 
-        # ==========================================
-        # GENERAZIONE GRAFICI
-        # ==========================================
-        print("\nGenerazione grafici in corso...")
-        sns.set_theme(style="whitegrid")
-        perc_labels = [int(p * 100) for p in percentuali]
-        delta_missing = [(baseline_acc - m) * 100 for m in risultati['Systemic_Missing']['media']]
-        delta_lag = [(baseline_acc - m) * 100 for m in risultati['Lag_25']['media']]
+        # ================= SALVATAGGIO RISULTATI =================
+        import json
         
-        # --- FIGURA 1: PERFORMANCE ---
-        fig1, axes1 = plt.subplots(1, 2, figsize=(16, 6))
+        # Pulizia dei dati NumPy per renderli salvabili in JSON
+        risultati_standardizzati = {
+            'Systemic_Missing': {
+                'media': [float(m) for m in risultati['Systemic_Missing']['media']],
+                'std': [float(s) for s in risultati['Systemic_Missing']['std']]
+            },
+            'Lag_25': {
+                'media': [float(m) for m in risultati['Lag_25']['media']],
+                'std': [float(s) for s in risultati['Lag_25']['std']]
+            }
+        }
         
-        axes1[0].errorbar(perc_labels, risultati['Systemic_Missing']['media'], yerr=risultati['Systemic_Missing']['std'], fmt='-o', label='A: Completezza (Blackout Elo)', color='#d62728', capsize=5, linewidth=2)
-        axes1[0].errorbar(perc_labels, risultati['Lag_25']['media'], yerr=risultati['Lag_25']['std'], fmt='-s', label='B: Tempestività (Lag 25 Partite)', color='#ff7f0e', capsize=5, linewidth=2)
-        axes1[0].axhline(y=baseline_acc, color='gray', linestyle='--', linewidth=2, label=f'Baseline ({baseline_acc:.4f})')
-        axes1[0].set_title('Completezza e Tempestività: Impatto sull\'Accuracy', fontsize=13, fontweight='bold')
-        axes1[0].set_xlabel('Percentuale di record corrotti (%)'); axes1[0].set_ylabel('Accuracy')
-        axes1[0].set_xticks(perc_labels); axes1[0].legend()
+        dati_da_salvare = {
+            "baseline_acc": float(baseline_acc),
+            "loss_baseline": [float(x) for x in loss_baseline] if hasattr(loss_baseline, "__iter__") else [],
+            "epoche_baseline": int(epoche_baseline),
+            "percentuali": [float(p) for p in percentuali],
+            "risultati": risultati_standardizzati,
+            "loss_target_50": [float(x) for x in loss_target_50] if loss_target_50 is not None else None,
+            "epoche_target_50": int(epoche_target_50)
+        }
         
-        x = np.arange(len(perc_labels)); width = 0.35
-        axes1[1].bar(x - width/2, delta_missing, width, label='Perdita Blackout', color='#d62728', alpha=0.85)
-        axes1[1].bar(x + width/2, delta_lag, width, label='Perdita Lag-25', color='#ff7f0e', alpha=0.85)
-        axes1[1].set_title("Calo di Performance (Delta %)", fontsize=13, fontweight='bold')
-        axes1[1].set_xlabel('Percentuale di record corrotti (%)'); axes1[1].set_ylabel('Perdita (%)')
-        axes1[1].set_xticks(x); axes1[1].set_xticklabels(perc_labels); axes1[1].legend()
-        
-        plt.tight_layout()
-        plt.savefig(os.path.join(plots_dir, "completezza_tempestivita_performance.png"), dpi=300)
-        
-        # --- FIGURA 2: LOSS CURVE ---
-        if loss_target_50 is not None:
-            fig2, ax2 = plt.subplots(figsize=(10, 5))
-            ax2.plot(loss_baseline, label=f'Baseline (Sana - {epoche_baseline} epoche)', color='gray', linewidth=2.5)
-            ax2.plot(loss_target_50, label=f'Blackout Sistemico 50% (Arresto a {epoche_target_50} epoche)', color='#d62728', linewidth=2.5, linestyle='--')
-            ax2.set_title("Analisi Runtime: Loss Curve (Completezza)", fontsize=14, fontweight='bold')
-            ax2.set_xlabel('Epoche'); ax2.set_ylabel('Loss'); ax2.legend()
-            plt.savefig(os.path.join(plots_dir, "completezza_loss_curve.png"), dpi=300)
-        
-        plt.show()
+        path_cache_risultati = os.path.join(plots_dir, "risultati_completezza.json")
+        with open(path_cache_risultati, "w") as f:
+            json.dump(dati_da_salvare, f, indent=4)
+        print(f"\n[OK] Risultati salvati correttamente in: {path_cache_risultati}")
+        print("Usa 'plot_completezza.py' per visualizzare e modificare i grafici.")
 
     except Exception as e:
         print(f"\nErrore: {e}")

@@ -122,6 +122,36 @@ if __name__ == "__main__":
             risultati['Gaussiano']['media'].append(m); risultati['Gaussiano']['std'].append(s)
             print(f"  -> Accuracy: {m:.4f} ± {s:.4f} | Delta: -{(baseline_acc - m)*100:.2f}%\n")
 
+        # ================= SALVATAGGIO RISULTATI =================
+        import json
+        
+        # Convertiamo i float di NumPy (float64) in float nativi di Python
+        risultati_standardizzati = {
+            'Outliers': {
+                'media': [float(m) for m in risultati['Outliers']['media']],
+                'std': [float(s) for s in risultati['Outliers']['std']]
+            },
+            'Gaussiano': {
+                'media': [float(m) for m in risultati['Gaussiano']['media']],
+                'std': [float(s) for s in risultati['Gaussiano']['std']]
+            }
+        }
+        
+        dati_da_salvare = {
+            "baseline_acc": float(baseline_acc),
+            "loss_baseline": [float(x) for x in loss_baseline] if hasattr(loss_baseline, "__iter__") else [],
+            "epoche_baseline": int(epoche_baseline),
+            "percentuali": [float(p) for p in percentuali],
+            "risultati": risultati_standardizzati,
+            "loss_target_50": [float(x) for x in loss_target_50] if loss_target_50 is not None else None,
+            "epoche_target_50": int(epoche_target_50)
+        }
+        
+        path_cache_risultati = os.path.join(plots_dir, "risultati_accuratezza.json")
+        with open(path_cache_risultati, "w") as f:
+            json.dump(dati_da_salvare, f, indent=4)
+        print(f"\n[OK] Risultati degli esperimenti salvati in: {path_cache_risultati}")
+
         # ================= GRAFICI =================
         print("\nGenerazione grafici in corso...")
         sns.set_theme(style="whitegrid")
