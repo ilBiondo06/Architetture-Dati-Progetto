@@ -1,4 +1,5 @@
 import os
+import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,7 +14,7 @@ from baseline_data_quality import train_and_evaluate_mlp, get_train_test_split, 
 
 def sporca_coerenza_target(y, percentage):
     """
-    EsperimentoTarget Flipping
+    Esperimento Target Flipping
     Simula un errore critico di coerenza logica. I dati fisici del match sono corretti, ma l'etichetta del vincitore viene invertita.
     """
     y_dirty = y.copy()
@@ -92,13 +93,11 @@ if __name__ == "__main__":
                 y_stale = sporca_coerenza_target(y_train_clean, percentage=p)
                 
                 if run == 0:
-                    # Salvataggio snapshot solo alla prima iterazione per i controlli di qualità 
                     df_to_save = X_train_clean.copy()
                     df_to_save['target'] = y_stale
                     dirty_filename = f"dataset_coerenza_targetflip_{int(p*100)}pct.csv"
                     df_to_save.to_csv(os.path.join(dirty_dir, dirty_filename), index=False)
                     
-                    # Catturiamo anche la loss curve e le epoche per il caso più estremo per un'analisi di runtime più approfondita
                     if p == 0.50:
                         acc, mlp_dirty = train_and_evaluate_mlp(X_train_clean, y_stale, X_test_clean, y_test_clean, return_model=True)
                         loss_target_50 = mlp_dirty.loss_curve_
@@ -139,6 +138,33 @@ if __name__ == "__main__":
         
             risultati['Elo_Ranking']['media'].append(media_acc)
             risultati['Elo_Ranking']['std'].append(std_acc)
+
+        # ================= SALVATAGGIO RISULTATI =================
+        risultati_standardizzati = {
+            'Target_Flipping': {
+                'media': [float(m) for m in risultati['Target_Flipping']['media']],
+                'std': [float(s) for s in risultati['Target_Flipping']['std']]
+            },
+            'Elo_Ranking': {
+                'media': [float(m) for m in risultati['Elo_Ranking']['media']],
+                'std': [float(s) for s in risultati['Elo_Ranking']['std']]
+            }
+        }
+        
+        dati_da_salvare = {
+            "baseline_acc": float(baseline_acc),
+            "loss_baseline": [float(x) for x in loss_baseline] if hasattr(loss_baseline, "__iter__") else [],
+            "epoche_baseline": int(epoche_baseline),
+            "percentuali": [float(p) for p in percentuali],
+            "risultati": risultati_standardizzati,
+            "loss_target_50": [float(x) for x in loss_target_50] if loss_target_50 is not None else None,
+            "epoche_target_50": int(epoche_target_50)
+        }
+        
+        path_cache_risultati = os.path.join(plots_dir, "risultati_coerenza.json")
+        with open(path_cache_risultati, "w") as f:
+            json.dump(dati_da_salvare, f, indent=4)
+        print(f"\n[OK] Risultati salvati correttamente in: {path_cache_risultati}")
 
         # ==========================================
         # GENERAZIONE E SALVATAGGIO DEI GRAFICI
@@ -182,7 +208,7 @@ if __name__ == "__main__":
         print(f"Grafico delle performance salvato in: {path_fig1}")
         
         # --- FIGURA 2: LOSS CURVE RUNTIME ---
-        if loss_target_50 is not None:
+        if loss_target_50 is not None and len(loss_target_50) > 0:
             fig2, ax2 = plt.subplots(figsize=(10, 5))
             ax2.plot(loss_baseline, label=f'Baseline: Convergenza in {epoche_baseline} epoche', color='#2ca02c', linewidth=2.5)
             ax2.plot(loss_target_50, label=f'Target Flipping 50%: Convergenza in {epoche_target_50} epoche', color='#d62728', linewidth=2.5, linestyle='--')
