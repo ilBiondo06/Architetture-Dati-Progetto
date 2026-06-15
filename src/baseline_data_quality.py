@@ -1,12 +1,14 @@
 import json
 import os
-
+import time
 import pandas as pd
 import numpy as np
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score,confusion_matrix
 import warnings
+
+
 
 warnings.filterwarnings('ignore')
 
@@ -32,23 +34,28 @@ def get_train_test_split(file_path):
     df = pd.read_csv(file_path)
     df['tourney_date'] = pd.to_datetime(df['tourney_date'])
     
+    df = df.sort_values('tourney_date').reset_index(drop=True)
+    
     train_mask = df['tourney_date'] < '2023-01-01'
     test_mask = df['tourney_date'] >= '2023-01-01'
     
-    X_train = df.loc[train_mask, FEATURES].fillna(0)
+    X_train = df.loc[train_mask, FEATURES + ['p1_id']].fillna(0)
     y_train = df.loc[train_mask, 'target']
-    X_test = df.loc[test_mask, FEATURES].fillna(0)
+    X_test = df.loc[test_mask, FEATURES + ['p1_id']].fillna(0)
     y_test = df.loc[test_mask, 'target']
     
     return X_train, y_train, X_test, y_test
 
 # Funzione per addestrare la MLP e valutare l'accuracy
 def train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=False):
-    """Scala i dati, addestra la MLP e ritorna l'accuracy."""
+    """Scala i dati, addestra la MLP e ritorna SEMPRE un dizionario con le metriche avanzate."""
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    X_train_model = X_train[FEATURES] if 'p1_id' in X_train.columns else X_train
+    X_test_model = X_test[FEATURES] if 'p1_id' in X_test.columns else X_test
     
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train_model)
+    X_test_scaled = scaler.transform(X_test_model)
     mlp = MLPClassifier(
         hidden_layer_sizes=(128, 128, 64, 32),
         activation='relu',
@@ -56,23 +63,41 @@ def train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=False)
         max_iter=150, 
         early_stopping=True,
         validation_fraction=0.15,
-        n_iter_no_change=15,
-        random_state=42
+        n_iter_no_change=15
     )
-    mlp.fit(X_train_scaled, y_train)
     
-    acc = mlp.score(X_test_scaled, y_test)
-        
-        # LA MAGIA È QUI:
+    # Calcolo tempo
+    start_time = time.time()
+    mlp.fit(X_train_scaled, y_train)
+    training_time = time.time() - start_time
+    
+    # Calcolo metriche
+    acc_test = mlp.score(X_test_scaled, y_test)
+    acc_train = mlp.score(X_train_scaled, y_train)
+    confidenza = np.max(mlp.predict_proba(X_test_scaled), axis=1).mean()
+    
+    y_pred = mlp.predict(X_test_scaled)
+    cm = confusion_matrix(y_test, y_pred).tolist()
+    
+    # Creiamo il dizionario con le metriche calcolate
+    metrics = {
+        'acc_test': float(acc_test),
+        'acc_train': float(acc_train),
+        'confidenza': float(confidenza),
+        'time': float(training_time),
+        'cm': cm
+    }
+    
+    # Aggiungiamo il modello solo se richiesto
     if return_model:
-        return acc, mlp
-    else:
-        return acc
+        metrics['mlp'] = mlp
+        
+    return metrics
 
 def get_or_compute_baseline(dataset_path):
     """
     Gestisce la persistenza della baseline su disco usando un file JSON.
-    Salva l'accuratezza, la loss curve e le epoche di convergenza.
+    Salva tutte le metriche avanzate (accuratezza, confidenza, tempi, CM, loss curve).
     """
     base_dir = os.path.dirname(os.path.abspath(__file__))
     cache_path = os.path.join(base_dir, "baseline_metrics.json")
@@ -85,20 +110,26 @@ def get_or_compute_baseline(dataset_path):
     print("Calcolo della Baseline e salvataggio delle metriche di addestramento...")
     X_train, y_train, X_test, y_test = get_train_test_split(dataset_path)
     
-    acc, mlp = train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=True)
+    # ESTRAIAMO I DATI DAL DIZIONARIO
+    metrics = train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=True)
+    mlp = metrics['mlp']
     
-    # Struttura dei metadati da salvare
+    # Struttura dei metadati da salvare COMPLETA
     cache_data = {
-        "accuracy": float(acc),
+        "accuracy": metrics['acc_test'],
+        "acc_train": metrics['acc_train'],
+        "confidenza": metrics['confidenza'],
+        "time": metrics['time'],
+        "cm": metrics['cm'],
         "n_iter": int(mlp.n_iter_),
         "loss_curve": [float(x) for x in mlp.loss_curve_]
     }
     
-    # Salviamo il file JSON nella cartella 'src'
+    # Salviamo il file JSON
     with open(cache_path, "w") as f:
         json.dump(cache_data, f, indent=4)
         
-    return acc
+    return metrics['acc_test']
 
 
 def load_baseline_cache():

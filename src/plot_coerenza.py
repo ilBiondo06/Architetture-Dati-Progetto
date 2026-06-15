@@ -8,90 +8,160 @@ import seaborn as sns
 # CONFIGURAZIONE PERCORSI
 # ==========================================
 base_folder = os.path.dirname(os.path.abspath(__file__))
-plots_dir = os.path.join(base_folder, "..", "results", "plots")
-path_cache_risultati = os.path.join(plots_dir, "risultati_coerenza.json")
+results_dir = os.path.join(base_folder, "..", "results")
+src_dir = os.path.join(base_folder, "..", "src")
+plots_dir = os.path.join(results_dir, "plots")
+os.makedirs(plots_dir, exist_ok=True) # Crea la cartella se non esiste
 
-# Verifica preliminare dell'esistenza dei dati calcolati
-if not os.path.exists(path_cache_risultati):
-    print(f"[ERRORE] File dei dati non trovato in: {path_cache_risultati}")
-    print("Devi prima eseguire lo script principale 'coerenza.py' per generare i risultati!")
+path_json = os.path.join(results_dir, "risultati_coerenza.json")
+path_json_base = os.path.join(src_dir, "baseline_metrics.json")
+
+if not os.path.exists(path_json):
+    print(f"[ERRORE] File dei dati non trovato in: {path_json}")
+    exit(1)
+
+if not os.path.exists(path_json_base):
+    print(f"[ERRORE] File della baseline non trovato in: {path_json_base}")
     exit(1)
 
 # ==========================================
 # CARICAMENTO DATI DAL JSON
 # ==========================================
-print(f"Caricamento dati da {path_cache_risultati}...")
-with open(path_cache_risultati, "r") as f:
+print(f"Generazione grafici in corso da: {path_json} e {path_json_base}...")
+
+with open(path_json, "r") as f:
     dati = json.load(f)
+    
+with open(path_json_base, "r") as f:
+    dati_base = json.load(f)
 
 baseline_acc = dati["baseline_acc"]
-loss_baseline = dati["loss_baseline"]
-epoche_baseline = dati["epoche_baseline"]
+cm_baseline = dati_base["cm"] # Matrice di confusione base (0%)
+
 percentuali = dati["percentuali"]
-risultati = dati["risultati"]
-loss_target_50 = dati["loss_target_50"]
-epoche_target_50 = dati["epoche_target_50"]
-
-# Ricalcolo delle etichette e dei delta per il plotting
 perc_labels = [int(p * 100) for p in percentuali]
-delta_target = [(baseline_acc - m) * 100 for m in risultati['Target_Flipping']['media']]
-delta_elo = [(baseline_acc - m) * 100 for m in risultati['Elo_Ranking']['media']]
+risultati = dati["risultati"]
 
-# ==========================================
-# GENERAZIONE E SALVATAGGIO DEI GRAFICI
-# ==========================================
-print("Generazione e salvataggio dei grafici in corso...")
 sns.set_theme(style="whitegrid")
 
-# --- FIGURA 1: ACCURATEZZA ASSOLUTA VS DELTA PERDITA (Affiancati) ---
+# ---------------------------------------------------------
+# GRAFICO 1: ACCURATEZZA CLASSICA E DELTA
+# ---------------------------------------------------------
 fig1, axes1 = plt.subplots(1, 2, figsize=(16, 6))
 
-# Subplot Sinistro: Andamento dell'Accuratezza
-axes1[0].errorbar(perc_labels, risultati['Target_Flipping']['media'], yerr=risultati['Target_Flipping']['std'], fmt='-o', label='Target Flipping', color='#d62728', capsize=5, linewidth=2)
-axes1[0].errorbar(perc_labels, risultati['Elo_Ranking']['media'], yerr=risultati['Elo_Ranking']['std'], fmt='-s', label='Incoerenza Elo-Ranking', color='#9467bd', capsize=5, linewidth=2)
-axes1[0].axhline(y=baseline_acc, color='#1f77b4', linestyle='--', linewidth=2, label=f'Baseline Intatta ({baseline_acc:.4f})')
-axes1[0].set_title('Accuratezza vs Percentuale di Errore', fontsize=13, fontweight='bold')
-axes1[0].set_xlabel('Record incoerenti (%)', fontsize=11)
-axes1[0].set_ylabel('Accuratezza Media', fontsize=11)
+axes1[0].errorbar(perc_labels, risultati['Target_Flipping']['media'], yerr=risultati['Target_Flipping']['std'], fmt='-o', label='Target Flipping (Critico)', color='#d62728', capsize=5, linewidth=2.5)
+axes1[0].errorbar(perc_labels, risultati['Elo_Ranking']['media'], yerr=risultati['Elo_Ranking']['std'], fmt='-s', label='Elo vs Ranking (Dominio)', color='#1f77b4', capsize=5, linewidth=2.5)
+axes1[0].axhline(y=baseline_acc, color='gray', linestyle='--', linewidth=2, label=f'Baseline ({baseline_acc:.4f})')
+axes1[0].set_title('Coerenza: Impatto sull\'Accuracy', fontsize=14, fontweight='bold')
+axes1[0].set_xlabel('Percentuale di record incoerenti (%)')
+axes1[0].set_ylabel('Accuracy')
 axes1[0].set_xticks(perc_labels)
-axes1[0].legend(loc='lower left')
+axes1[0].legend()
 
-# Subplot Destro: Istogramma del Calo di Performance (Delta %)
+delta_target = [(baseline_acc - m) * 100 for m in risultati['Target_Flipping']['media']]
+delta_elo = [(baseline_acc - m) * 100 for m in risultati['Elo_Ranking']['media']]
 x = np.arange(len(perc_labels))
 width = 0.35
+
 axes1[1].bar(x - width/2, delta_target, width, label='Perdita Target Flipping', color='#d62728', alpha=0.85)
-axes1[1].bar(x + width/2, delta_elo, width, label='Perdita Incoerenza Elo-Rank', color='#9467bd', alpha=0.85)
-axes1[1].set_title("Calo di Performance (Delta %)", fontsize=13, fontweight='bold')
-axes1[1].set_xlabel('Record incoerenti (%)', fontsize=11)
-axes1[1].set_ylabel('Perdita di Accuratezza rispetto alla Baseline (Delta %)', fontsize=11)
+axes1[1].bar(x + width/2, delta_elo, width, label='Perdita Elo vs Rank', color='#1f77b4', alpha=0.85)
+axes1[1].set_title("Calo di Performance Netta (Delta %)", fontsize=14, fontweight='bold')
+axes1[1].set_xlabel('Percentuale di record incoerenti (%)')
+axes1[1].set_ylabel('Perdita (%)')
 axes1[1].set_xticks(x)
 axes1[1].set_xticklabels(perc_labels)
-axes1[1].legend(loc='upper left')
-
-# Aggiunta dei testi con la percentuale esatta sopra le ultime colonne (50%)
-axes1[1].text(x[-1] - width/2, delta_target[-1] + 0.3, f"{delta_target[-1]:.1f}%", ha='center', fontsize=10, fontweight='bold')
-axes1[1].text(x[-1] + width/2, delta_elo[-1] + 0.3, f"{delta_elo[-1]:.1f}%", ha='center', fontsize=10, fontweight='bold')
+axes1[1].legend()
 
 plt.tight_layout()
-path_fig1 = os.path.join(plots_dir, "coerenza_accuratezza_vs_delta.png")
-plt.savefig(path_fig1, dpi=300)
-print(f"[OK] Grafico delle performance salvato in: {path_fig1}")
+plt.savefig(os.path.join(plots_dir, "coerenza_01_performance_assoluta.png"), dpi=300)
 
-# --- FIGURA 2: LOSS CURVE RUNTIME ---
-if loss_target_50 is not None and len(loss_target_50) > 0:
-    fig2, ax2 = plt.subplots(figsize=(10, 5))
-    ax2.plot(loss_baseline, label=f'Baseline: Convergenza in {epoche_baseline} epoche', color='#2ca02c', linewidth=2.5)
-    ax2.plot(loss_target_50, label=f'Target Flipping 50%: Convergenza in {epoche_target_50} epoche', color='#d62728', linewidth=2.5, linestyle='--')
-    ax2.set_title("Analisi di Runtime: Come cambia l'apprendimento (Loss Curve)", fontsize=14, fontweight='bold')
-    ax2.set_xlabel('Epoche di addestramento', fontsize=12)
-    ax2.set_ylabel('Error Loss', fontsize=12)
-    ax2.legend()
-    
-    plt.tight_layout()
-    path_fig2 = os.path.join(plots_dir, "coerenza_loss_curve.png")
-    plt.savefig(path_fig2, dpi=300)
-    print(f"[OK] Grafico delle Loss Curve salvato in: {path_fig2}")
+# -------------------------------
+# GRAFICO 2: GAP TRAIN VS TEST
+# -------------------------------
+plt.figure(figsize=(12, 7))
 
-# Mostra i grafici a schermo
-plt.show()
-print("[FINE] Tutti i grafici sono stati visualizzati e aggiornati!")
+plt.plot(perc_labels, risultati['Target_Flipping']['media_train'], label='Train (Target Flipping)', color='#ff7f0e', marker='o', linewidth=2.5, linestyle='--')
+plt.plot(perc_labels, risultati['Target_Flipping']['media'], label='Test (Target Flipping)', color='#d62728', marker='s', linewidth=2.5)
+plt.fill_between(perc_labels, risultati['Target_Flipping']['media'], risultati['Target_Flipping']['media_train'], color='#ff7f0e', alpha=0.15)
+
+plt.plot(perc_labels, risultati['Elo_Ranking']['media_train'], label='Train (Elo vs Ranking)', color='#2ca02c', marker='^', linewidth=2.5, linestyle='--')
+plt.plot(perc_labels, risultati['Elo_Ranking']['media'], label='Test (Elo vs Ranking)', color='#1f77b4', marker='D', linewidth=2.5)
+plt.fill_between(perc_labels, risultati['Elo_Ranking']['media'], risultati['Elo_Ranking']['media_train'], color='#1f77b4', alpha=0.15)
+
+plt.title('La Forbice dell\'Overfitting: Train vs Test per Esperimento', fontsize=14, fontweight='bold')
+plt.xlabel('Percentuale di record incoerenti (%)')
+plt.ylabel('Accuratezza')
+plt.legend()
+plt.savefig(os.path.join(plots_dir, "coerenza_02_train_test_gap.png"), dpi=300)
+
+# ----------------------------------
+# GRAFICO 3: CONFIDENZA PREDITTIVA 
+# ----------------------------------
+plt.figure(figsize=(10, 5))
+plt.plot(perc_labels, [c * 100 for c in risultati['Target_Flipping']['confidenza']], label='Target Flipping', color='purple', marker='o', linewidth=2.5)
+plt.plot(perc_labels, [c * 100 for c in risultati['Elo_Ranking']['confidenza']], label='Elo vs Ranking', color='teal', marker='s', linewidth=2.5)
+plt.axhline(y=70.0, color='gray', linestyle='--', label='Soglia Teorica di Rischio (70%)')
+
+plt.title('Il Crollo delle Certezze: Confidenza Predittiva', fontsize=14, fontweight='bold')
+plt.xlabel('Percentuale di record incoerenti (%)')
+plt.ylabel('Probabilità media delle previsioni (%)')
+plt.legend()
+plt.savefig(os.path.join(plots_dir, "coerenza_03_confidenza.png"), dpi=300)
+
+# ---------------------------------
+# GRAFICO 4: COSTO COMPUTAZIONALE
+# ---------------------------------
+plt.figure(figsize=(10, 5))
+plt.plot(perc_labels, risultati['Target_Flipping']['tempi'], label='Target Flipping', color='orange', marker='o', linewidth=2.5)
+plt.plot(perc_labels, risultati['Elo_Ranking']['tempi'], label='Elo vs Ranking', color='blue', marker='s', linewidth=2.5)
+
+plt.title('Impatto Computazionale: Tempi di Addestramento', fontsize=14, fontweight='bold')
+plt.xlabel('Percentuale di record incoerenti (%)')
+plt.ylabel('Tempo impiegato (secondi)')
+plt.legend()
+plt.savefig(os.path.join(plots_dir, "coerenza_04_tempi_calcolo.png"), dpi=300)
+
+# -------------------------------------------------------------
+# GRAFICO 5 e 6: EVOLUZIONE MATRICE DI CONFUSIONE (DOPPIO)
+# -------------------------------------------------------------
+def plot_matrici_confusione(exp_key, exp_title, colormap, filename, base_cm):
+    cm_dict = risultati[exp_key].get('cm_per_step')
+    if cm_dict is not None and len(cm_dict) > 0:
+        fig, axes = plt.subplots(2, 3, figsize=(14, 8))
+        axes = axes.flatten()
+        
+        # 1. Matrice Base (dati presi da baseline_metrics.json)
+        sns.heatmap(np.array(base_cm), annot=True, fmt='d', cmap=colormap, cbar=False,
+                    xticklabels=['Sconfitta', 'Vittoria'],
+                    yticklabels=['Sconfitta', 'Vittoria'], ax=axes[0])
+        axes[0].set_title("Degrado: 0% (Baseline)", fontweight='bold')
+        axes[0].set_xlabel('Predetto')
+        axes[0].set_ylabel('Vero')
+
+        # 2. Matrici di degrado
+        sorted_keys = sorted(cm_dict.keys(), key=float)
+        for i, p_str in enumerate(sorted_keys):
+            cm = np.array(cm_dict[p_str])
+            perc_int = int(float(p_str) * 100)
+            
+            ax_idx = i + 1 
+            
+            sns.heatmap(cm, annot=True, fmt='d', cmap=colormap, cbar=False,
+                        xticklabels=['Sconfitta', 'Vittoria'],
+                        yticklabels=['Sconfitta', 'Vittoria'], ax=axes[ax_idx])
+            
+            axes[ax_idx].set_title(f"Degrado: {perc_int}%", fontweight='bold')
+            axes[ax_idx].set_xlabel('Predetto')
+            axes[ax_idx].set_ylabel('Vero')
+            
+        plt.suptitle(f'Evoluzione del Caos: Matrici di Confusione ({exp_title})', fontsize=16, fontweight='bold', y=1.05)
+        plt.tight_layout()
+        plt.savefig(os.path.join(plots_dir, filename), dpi=300, bbox_inches='tight')
+
+# Genera la griglia per Target Flipping (in rosso)
+plot_matrici_confusione('Target_Flipping', 'Target Flipping', 'Reds', "coerenza_05_matrici_target.png", cm_baseline)
+
+# Genera la griglia per Elo Ranking (in blu)
+plot_matrici_confusione('Elo_Ranking', 'Elo vs Ranking', 'Blues', "coerenza_06_matrici_elo.png", cm_baseline)
+
+print(f"Tutti i grafici sono stati generati e salvati in: {plots_dir}")
