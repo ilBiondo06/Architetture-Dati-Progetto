@@ -28,10 +28,11 @@ def missing_values_zero_systemic(X, percentage):
     return X_dirty
 
 
-def sporca_elo_last(X, percentage, lag=25):
+def temporaly_lag(X, percentage, lag=5):
     """
-    ESPERIMENTO B: Tempestività (Data Staleness)
-    Simula un ritardo nell'aggiornamento dell'Elo (Lag-25).
+    ESPERIMENTO B: Lag temporaneo (Data Staleness)
+    Raggruppa lo storico per singolo giocatore (p1_id) e usa le sue 
+    metriche Elo vecchie di 'lag' partite.
     """
     X_dirty = X.copy()
     n_changes = int(len(X_dirty) * percentage)
@@ -40,7 +41,7 @@ def sporca_elo_last(X, percentage, lag=25):
     idx = np.random.choice(X_dirty.index, n_changes, replace=False)
     
     for col in elo_cols:
-        stale_values = X_dirty[col].shift(lag).bfill()
+        stale_values = X_dirty.groupby('p1_id')[col].shift(lag).bfill()
         X_dirty.loc[idx, col] = stale_values.loc[idx]
         
     return X_dirty
@@ -51,7 +52,7 @@ def sporca_elo_last(X, percentage, lag=25):
 # ==========================================
 
 if __name__ == "__main__":
-    print("--- INIZIO PIPELINE: ESPERIMENTI COMPLETEZZA E TEMPESTIVITÀ (METRICHE AVANZATE) ---")
+    print("--- INIZIO PIPELINE: ESPERIMENTI COMPLETEZZA E TEMPESTIVITÀ ---")
     
     # 1. Configurazione Percorsi
     base_folder = os.path.dirname(os.path.abspath(__file__))
@@ -69,13 +70,13 @@ if __name__ == "__main__":
     
     X_train_clean, y_train_clean, X_test_clean, y_test_clean = get_train_test_split(dataset_path)
     
-    percentuali = [0.05, 0.10, 0.20, 0.30, 0.50]  
+    percentuali = [0.10, 0.20, 0.40, 0.60, 0.80]
     N_RUNS = 10  
     
     # 3. Struttura dati arricchita
     risultati = {
         'Systemic_Missing': {'media': [], 'std': [], 'media_train': [], 'confidenza': [], 'tempi': [], 'cm_per_step': {}},
-        'Lag_25': {'media': [], 'std': [], 'media_train': [], 'confidenza': [], 'tempi': [], 'cm_per_step': {}}
+        'Lag_10': {'media': [], 'std': [], 'media_train': [], 'confidenza': [], 'tempi': [], 'cm_per_step': {}}
     }
 
     # -----------------------------------------------------------------
@@ -113,19 +114,19 @@ if __name__ == "__main__":
         risultati['Systemic_Missing']['tempi'].append(float(np.mean(r_time)))
 
     # -----------------------------------------------------------------
-    # ESPERIMENTO B: DATA STALENESS LAG-25 (TEMPESTIVITÀ)
+    # ESPERIMENTO B: TEMPORALY LAG (TEMPESTIVITÀ)
     # -----------------------------------------------------------------
-    print(f"\n--- AVVIO ESPERIMENTO B: DATI OBSOLETI (LAG-25) | {N_RUNS} RUNS ---")
+    print(f"\n--- AVVIO ESPERIMENTO B: DATI OBSOLETI (LAG-10) | {N_RUNS} RUNS ---")
     for p in percentuali:
         r_acc_test, r_acc_train, r_conf, r_time = [], [], [], []
         
         for run in tqdm(range(N_RUNS), desc=f"Degrado {p*100:0.0f}%", colour='yellow'):
-            X_stale = sporca_elo_last(X_train_clean, percentage=p, lag=25)
+            X_stale = temporaly_lag(X_train_clean, percentage=p, lag=10)
             
             if run == 0:
                 df_to_save = X_stale.copy()
                 df_to_save['target'] = y_train_clean
-                df_to_save.to_csv(os.path.join(dirty_dir, f"dataset_tempestivita_lag25_{int(p*100)}pct.csv"), index=False)
+                df_to_save.to_csv(os.path.join(dirty_dir, f"dataset_tempestivita_lag10_{int(p*100)}pct.csv"), index=False)
             
             metrics = train_and_evaluate_mlp(X_stale, y_train_clean, X_test_clean, y_test_clean)
             
@@ -135,14 +136,14 @@ if __name__ == "__main__":
             r_time.append(metrics['time'])
             
             if run == 0:
-                risultati['Lag_25']['cm_per_step'][str(p)] = metrics['cm']
+                risultati['Lag_10']['cm_per_step'][str(p)] = metrics['cm']
                 
         # Aggregazione Statistica
-        risultati['Lag_25']['media'].append(float(np.mean(r_acc_test)))
-        risultati['Lag_25']['std'].append(float(np.std(r_acc_test)))
-        risultati['Lag_25']['media_train'].append(float(np.mean(r_acc_train)))
-        risultati['Lag_25']['confidenza'].append(float(np.mean(r_conf)))
-        risultati['Lag_25']['tempi'].append(float(np.mean(r_time)))
+        risultati['Lag_10']['media'].append(float(np.mean(r_acc_test)))
+        risultati['Lag_10']['std'].append(float(np.std(r_acc_test)))
+        risultati['Lag_10']['media_train'].append(float(np.mean(r_acc_train)))
+        risultati['Lag_10']['confidenza'].append(float(np.mean(r_conf)))
+        risultati['Lag_10']['tempi'].append(float(np.mean(r_time)))
 
     # ==========================================
     # SALVATAGGIO JSON
