@@ -50,16 +50,16 @@ sns.set_theme(style="whitegrid")
 fig1, axes1 = plt.subplots(1, 2, figsize=(16, 6))
 
 axes1[0].errorbar(perc_labels, risultati['Systemic_Missing']['media'], yerr=risultati['Systemic_Missing']['std'], fmt='-o', label='Blackout (Completezza)', color='#d62728', capsize=5, linewidth=2.5)
-axes1[0].errorbar(perc_labels, risultati['Lag_25']['media'], yerr=risultati['Lag_25']['std'], fmt='-s', label='Lag-25 (Tempestività)', color='#ff7f0e', capsize=5, linewidth=2.5)
+axes1[0].errorbar(perc_labels, risultati['Lag_10']['media'], yerr=risultati['Lag_10']['std'], fmt='-s', label='Lag-25 (Tempestività)', color='#ff7f0e', capsize=5, linewidth=2.5)
 axes1[0].axhline(y=baseline_acc, color='gray', linestyle='--', linewidth=2, label=f'Baseline ({baseline_acc:.4f})')
-axes1[0].set_title('Completezza e Tempestività: Impatto Assoluto', fontsize=14, fontweight='bold')
+axes1[0].set_title('Completezza e Tempestività', fontsize=14, fontweight='bold')
 axes1[0].set_xlabel('Percentuale di record corrotti (%)')
 axes1[0].set_ylabel('Accuracy')
 axes1[0].set_xticks(perc_labels)
 axes1[0].legend()
 
 delta_missing = [(baseline_acc - m) * 100 for m in risultati['Systemic_Missing']['media']]
-delta_lag = [(baseline_acc - m) * 100 for m in risultati['Lag_25']['media']]
+delta_lag = [(baseline_acc - m) * 100 for m in risultati['Lag_10']['media']]
 x = np.arange(len(perc_labels))
 width = 0.35
 
@@ -86,9 +86,9 @@ plt.plot(perc_labels, risultati['Systemic_Missing']['media'], label='Test (Black
 plt.fill_between(perc_labels, risultati['Systemic_Missing']['media'], risultati['Systemic_Missing']['media_train'], color='#d62728', alpha=0.15)
 
 # Lag-25
-plt.plot(perc_labels, risultati['Lag_25']['media_train'], label='Train (Lag-25)', color='#ffbb78', marker='^', linewidth=2.5, linestyle='--')
-plt.plot(perc_labels, risultati['Lag_25']['media'], label='Test (Lag-25)', color='#ff7f0e', marker='D', linewidth=2.5)
-plt.fill_between(perc_labels, risultati['Lag_25']['media'], risultati['Lag_25']['media_train'], color='#ff7f0e', alpha=0.15)
+plt.plot(perc_labels, risultati['Lag_10']['media_train'], label='Train (Lag-10)', color='#ffbb78', marker='^', linewidth=2.5, linestyle='--')
+plt.plot(perc_labels, risultati['Lag_10']['media'], label='Test (Lag-10)', color='#ff7f0e', marker='D', linewidth=2.5)
+plt.fill_between(perc_labels, risultati['Lag_10']['media'], risultati['Lag_10']['media_train'], color='#ff7f0e', alpha=0.15)
 
 plt.title('La Forbice dell\'Overfitting: Train vs Test per Esperimento', fontsize=14, fontweight='bold')
 plt.xlabel('Percentuale di record corrotti (%)')
@@ -101,7 +101,7 @@ plt.savefig(os.path.join(plots_dir, "completezza_02_train_test_gap.png"), dpi=30
 # ---------------------------------------------------------
 plt.figure(figsize=(10, 5))
 plt.plot(perc_labels, [c * 100 for c in risultati['Systemic_Missing']['confidenza']], label='Blackout', color='#d62728', marker='o', linewidth=2.5)
-plt.plot(perc_labels, [c * 100 for c in risultati['Lag_25']['confidenza']], label='Lag-25', color='#ff7f0e', marker='s', linewidth=2.5)
+plt.plot(perc_labels, [c * 100 for c in risultati['Lag_10']['confidenza']], label='Lag-10', color='#ff7f0e', marker='s', linewidth=2.5)
 plt.axhline(y=70.0, color='gray', linestyle='--', label='Soglia Teorica di Rischio (70%)')
 
 plt.title('Il Crollo delle Certezze: Confidenza Predittiva', fontsize=14, fontweight='bold')
@@ -115,7 +115,7 @@ plt.savefig(os.path.join(plots_dir, "completezza_03_confidenza.png"), dpi=300)
 # ---------------------------------------------------------
 plt.figure(figsize=(10, 5))
 plt.plot(perc_labels, risultati['Systemic_Missing']['tempi'], label='Blackout', color='#d62728', marker='o', linewidth=2.5)
-plt.plot(perc_labels, risultati['Lag_25']['tempi'], label='Lag-25', color='#ff7f0e', marker='s', linewidth=2.5)
+plt.plot(perc_labels, risultati['Lag_10']['tempi'], label='Lag-10', color='#ff7f0e', marker='s', linewidth=2.5)
 
 plt.title('Impatto Computazionale: Tempi di Addestramento', fontsize=14, fontweight='bold')
 plt.xlabel('Percentuale di record corrotti (%)')
@@ -163,7 +163,7 @@ def plot_matrici_confusione(exp_key, exp_title, colormap, filename, base_cm):
 # Genera la griglia per Systemic Missing (in rosso)
 plot_matrici_confusione('Systemic_Missing', 'Blackout', 'Reds', "completezza_05_matrici_missing.png", cm_baseline)
 
-# Genera la griglia per Lag-25 (in arancione)
-plot_matrici_confusione('Lag_25', 'Lag-25', 'Oranges', "completezza_06_matrici_lag.png", cm_baseline)
+# Genera la griglia per Lag-10 (in arancione)
+plot_matrici_confusione('Lag_10', 'Lag-10', 'Oranges', "completezza_06_matrici_lag.png", cm_baseline)
 
 print(f"Tutti i grafici sono stati generati e salvati in: {plots_dir}")

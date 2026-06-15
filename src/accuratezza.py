@@ -11,16 +11,18 @@ from baseline_data_quality import get_train_test_split, get_or_compute_baseline,
 # ==========================================
 
 def eta_altezza_outliers(X, percentage):
-    """
-    ESPERIMENTO A: Outliers Estremi
-    Inserisce differenze fisicamente impossibili (+- 150cm, +- 80 anni).
-    """
     X_dirty = X.copy()
     n_changes = int(len(X_dirty) * percentage)
     
     idx = np.random.choice(X_dirty.index, n_changes, replace=False)
-    X_dirty.loc[idx, 'diff_ht'] = np.random.choice([150.0, -150.0], size=n_changes)
-    X_dirty.loc[idx, 'diff_age'] = np.random.choice([80.0, -80.0], size=n_changes)
+    
+    # creiamo array di valori assurdi casuali
+    # moltiplicati per 1 o -1 per avere sia giganti che altezze negative
+    sbalzo_altezza = np.random.uniform(100.0, 200.0, size=n_changes) * np.random.choice([1, -1], size=n_changes)
+    sbalzo_eta = np.random.uniform(50.0, 100.0, size=n_changes) * np.random.choice([1, -1], size=n_changes)
+    
+    X_dirty.loc[idx, 'diff_ht'] = sbalzo_altezza
+    X_dirty.loc[idx, 'diff_age'] = sbalzo_eta
     
     return X_dirty
 
@@ -63,7 +65,7 @@ if __name__ == "__main__":
     
     X_train_clean, y_train_clean, X_test_clean, y_test_clean = get_train_test_split(dataset_path)
     
-    percentuali = [0.05, 0.10, 0.20, 0.30, 0.50]  
+    percentuali = [0.10, 0.20, 0.40, 0.60, 0.80]  
     N_RUNS = 10  
     
     # 3. Struttura dati arricchita

@@ -39,9 +39,9 @@ def get_train_test_split(file_path):
     train_mask = df['tourney_date'] < '2023-01-01'
     test_mask = df['tourney_date'] >= '2023-01-01'
     
-    X_train = df.loc[train_mask, FEATURES].fillna(0)
+    X_train = df.loc[train_mask, FEATURES + ['p1_id']].fillna(0)
     y_train = df.loc[train_mask, 'target']
-    X_test = df.loc[test_mask, FEATURES].fillna(0)
+    X_test = df.loc[test_mask, FEATURES + ['p1_id']].fillna(0)
     y_test = df.loc[test_mask, 'target']
     
     return X_train, y_train, X_test, y_test
@@ -50,9 +50,12 @@ def get_train_test_split(file_path):
 def train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=False):
     """Scala i dati, addestra la MLP e ritorna SEMPRE un dizionario con le metriche avanzate."""
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    X_train_model = X_train[FEATURES] if 'p1_id' in X_train.columns else X_train
+    X_test_model = X_test[FEATURES] if 'p1_id' in X_test.columns else X_test
     
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train_model)
+    X_test_scaled = scaler.transform(X_test_model)
     mlp = MLPClassifier(
         hidden_layer_sizes=(128, 128, 64, 32),
         activation='relu',
