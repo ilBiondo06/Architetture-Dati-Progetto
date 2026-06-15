@@ -1,7 +1,0 @@
-Dataset,Righe Totali,Righe Perse (Drop),% Righe Perse,N. Colonne Perse,Esempi Colonne Perse
-CLEANED_BASE,74853,0,0.0,0,Nessuna
-lag25_10pct,68846,6007,8.03,48,"loser_id, w_SvGms, winner_rank_points"
-lag25_20pct,68846,6007,8.03,48,"loser_id, w_SvGms, winner_rank_points"
-lag25_30pct,68846,6007,8.03,48,"loser_id, w_SvGms, winner_rank_points"
-lag25_50pct,68846,6007,8.03,48,"loser_id, w_SvGms, winner_rank_points"
-lag25_5pct,68846,6007,8.03,48,"loser_id, w_SvGms, winner_rank_points"
