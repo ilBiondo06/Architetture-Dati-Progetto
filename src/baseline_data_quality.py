@@ -5,10 +5,8 @@ import pandas as pd
 import numpy as np
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score,confusion_matrix
+from sklearn.metrics import accuracy_score, confusion_matrix
 import warnings
-
-
 
 warnings.filterwarnings('ignore')
 
@@ -53,9 +51,9 @@ def train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=False)
     X_train_model = X_train[FEATURES] if 'p1_id' in X_train.columns else X_train
     X_test_model = X_test[FEATURES] if 'p1_id' in X_test.columns else X_test
     
-    scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train_model)
     X_test_scaled = scaler.transform(X_test_model)
+    
     mlp = MLPClassifier(
         hidden_layer_sizes=(128, 128, 64, 32),
         activation='relu',
@@ -94,70 +92,88 @@ def train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=False)
         
     return metrics
 
-def get_or_compute_baseline(dataset_path):
+def get_or_compute_baseline(dataset_path, n_runs=10):
     """
-    Gestisce la persistenza della baseline su disco usando un file JSON.
-    Salva tutte le metriche avanzate (accuratezza, confidenza, tempi, CM, loss curve).
+    Gestisce la persistenza della baseline su disco usando un file JSON (salvato in 'results').
+    Esegue l'addestramento n_runs volte per calcolare una media robusta delle metriche.
     """
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    cache_path = os.path.join(base_dir, "baseline_metrics.json")
+    results_dir = os.path.join(base_dir, "..", "results")
+    os.makedirs(results_dir, exist_ok=True)
+    
+    cache_path = os.path.join(results_dir, "baseline_metrics.json")
     
     if os.path.exists(cache_path):
         with open(cache_path, "r") as f:
             data = json.load(f)
         return data["accuracy"]
     
-    print("Calcolo della Baseline e salvataggio delle metriche di addestramento...")
+    print(f"Calcolo della Baseline su {n_runs} run indipendenti per stabilità statistica...")
     X_train, y_train, X_test, y_test = get_train_test_split(dataset_path)
     
-    # ESTRAIAMO I DATI DAL DIZIONARIO
-    metrics = train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=True)
-    mlp = metrics['mlp']
+    runs_data = []
     
-    # Struttura dei metadati da salvare COMPLETA
+    # Eseguiamo n_runs per fare la media
+    for i in range(n_runs):
+        print(f"  -> Esecuzione run {i+1}/{n_runs}...")
+        metrics = train_and_evaluate_mlp(X_train, y_train, X_test, y_test, return_model=True)
+        runs_data.append(metrics)
+        
+    # Estraiamo le metriche per fare la media
+    acc_tests = [r['acc_test'] for r in runs_data]
+    acc_trains = [r['acc_train'] for r in runs_data]
+    confidenze = [r['confidenza'] for r in runs_data]
+    tempi = [r['time'] for r in runs_data]
+    
+    mean_acc = np.mean(acc_tests)
+    
+    # Troviamo la run "Mediana" (quella più vicina alla media calcolata) 
+    # per prelevare la matrice di confusione e la loss curve più rappresentative
+    closest_idx = np.argmin(np.abs(np.array(acc_tests) - mean_acc))
+    representative_run = runs_data[closest_idx]
+    representative_mlp = representative_run['mlp']
+    
+    # Struttura dei metadati mediati da salvare
     cache_data = {
-        "accuracy": metrics['acc_test'],
-        "acc_train": metrics['acc_train'],
-        "confidenza": metrics['confidenza'],
-        "time": metrics['time'],
-        "cm": metrics['cm'],
-        "n_iter": int(mlp.n_iter_),
-        "loss_curve": [float(x) for x in mlp.loss_curve_]
+        "accuracy": float(mean_acc),
+        "acc_train": float(np.mean(acc_trains)),
+        "confidenza": float(np.mean(confidenze)),
+        "time": float(np.mean(tempi)),
+        "cm": representative_run['cm'],
+        "n_iter": int(representative_mlp.n_iter_),
+        "loss_curve": [float(x) for x in representative_mlp.loss_curve_]
     }
     
-    # Salviamo il file JSON
+    # Salviamo il file JSON nella cartella results
     with open(cache_path, "w") as f:
         json.dump(cache_data, f, indent=4)
         
-    return metrics['acc_test']
-
+    print(f"Baseline calcolata e salvata con successo in: {cache_path}")
+    return cache_data['accuracy']
 
 def load_baseline_cache():
     """
-    Funzione helper per caricare l'intero dizionario delle metriche salvate in cache.
+    Funzione helper per caricare l'intero dizionario delle metriche salvate in cache dalla cartella results.
     """
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    cache_path = os.path.join(base_dir, "baseline_metrics.json")
+    cache_path = os.path.join(base_dir, "..", "results", "baseline_metrics.json")
     
     if os.path.exists(cache_path):
         with open(cache_path, "r") as f:
             return json.load(f)
     return None
 
-
-
 # ESECUZIONE PRINCIPALE
-
 if __name__ == "__main__":
     print("-- INIZIO PIPELINE DATA QUALITY --")
     
     # Calcolo dinamico del path rispetto alla posizione dello script (cartella 'src')
     base_folder = os.path.dirname(os.path.abspath(__file__))
-    dataset_path = os.path.join(base_folder, "..", "data","clean", "dataset_ml_ready.csv") 
+    dataset_path = os.path.join(base_folder, "..", "data", "clean", "dataset_ml_ready.csv") 
     
     try:
         baseline_acc = get_or_compute_baseline(dataset_path)
-        print(f"\nAccuracy Baseline = {baseline_acc:.4f}")
+        print(f"\nAccuracy Media Baseline = {baseline_acc:.4f}")
         
     except FileNotFoundError:
         print(f"\nERRORE: file {dataset_path} non trovato")

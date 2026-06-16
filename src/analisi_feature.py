@@ -18,9 +18,7 @@ def calcola_e_plotta_evoluzione(esperimento_nome, prefisso_file, test_clean_X, t
     Legge i CSV sporchi di un esperimento, calcola la Feature Importance 
     per ogni step e genera un grafico a griglia dell'evoluzione dei pesi decisionali.
     """
-    print(f"\n{'='*60}")
-    print(f"🚀 AVVIO ANALISI FEATURE IMPORTANCE: {esperimento_nome}")
-    print(f"{'='*60}")
+    print(f"AVVIO ANALISI FEATURE IMPORTANCE: {esperimento_nome}")
     
     # Setup percorsi
     base_folder = os.path.dirname(os.path.abspath(__file__))
@@ -33,7 +31,7 @@ def calcola_e_plotta_evoluzione(esperimento_nome, prefisso_file, test_clean_X, t
     importanza_per_step = {}
     
     # -------------------------------------
-    # 1. TOP 8 DELLA BASELINE
+    # 1. TOP 8 DELLA BASELINE (DEGRADO 0%)
     # -------------------------------------
     clean_csv = os.path.join(base_folder, "..", "data", "clean", "dataset_ml_ready.csv")
     X_train_clean, y_train_clean, _, _ = get_train_test_split(clean_csv)
@@ -46,8 +44,9 @@ def calcola_e_plotta_evoluzione(esperimento_nome, prefisso_file, test_clean_X, t
     X_test_scaled = scaler_clean.transform(test_clean_X)
     
     print("[1/3] Addestramento Baseline Sana...")
+    # AGGIUNTO RANDOM_STATE=42 per isolare l'effetto del degrado
     mlp_clean = MLPClassifier(hidden_layer_sizes=(128, 128, 64, 32), activation='relu', 
-                              alpha=0.01, max_iter=150, early_stopping=True)
+                              alpha=0.01, max_iter=150, early_stopping=True, random_state=42)
     mlp_clean.fit(X_train_scaled, y_train_clean)
     
     print("[2/3] Estrazione pesi decisionali (Permutation Importance)...")
@@ -57,6 +56,9 @@ def calcola_e_plotta_evoluzione(esperimento_nome, prefisso_file, test_clean_X, t
     # Fissiamo le 8 feature più importanti del modello sano per il confronto
     top_features = df_clean.sort_values(by='Importanza', ascending=False).head(8)['Feature'].tolist()
     max_importanza_assoluta = df_clean['Importanza'].max()
+    
+    # INSERIAMO LA BASELINE COME PRIMO GRAFICO (0%)
+    importanza_per_step["0"] = df_clean[df_clean['Feature'].isin(top_features)]
     
     # ---------------------------------------------------------
     # 2. CICLO SUI DATASET SPORCHI
@@ -85,8 +87,9 @@ def calcola_e_plotta_evoluzione(esperimento_nome, prefisso_file, test_clean_X, t
         scaler_dirty = StandardScaler()
         X_train_dirty_scaled = scaler_dirty.fit_transform(X_dirty)
         
+        # AGGIUNTO RANDOM_STATE=42
         mlp_dirty = MLPClassifier(hidden_layer_sizes=(128, 128, 64, 32), activation='relu', 
-                                  alpha=0.01, max_iter=150, early_stopping=True)
+                                  alpha=0.01, max_iter=150, early_stopping=True, random_state=42)
         mlp_dirty.fit(X_train_dirty_scaled, y_dirty)
         
         # Testiamo l'importanza sulle feature della realtà (Dati PULITI)
@@ -99,11 +102,8 @@ def calcola_e_plotta_evoluzione(esperimento_nome, prefisso_file, test_clean_X, t
     # 3. GENERAZIONE GRAFICO A GRIGLIA
     # -----------------------------------
     if importanza_per_step:
-        num_plots = len(importanza_per_step)
-        cols = 3
-        rows = int(np.ceil(num_plots / cols))
-        
-        fig, axes = plt.subplots(rows, cols, figsize=(16, 5 * rows))
+        # Avendo aggiunto lo zero, ora i plot sono esattamente 6. Perfetto per 2 righe da 3 colonne!
+        fig, axes = plt.subplots(2, 3, figsize=(18, 10))
         axes = axes.flatten()
         
         for i, (p_str, df_plot) in enumerate(importanza_per_step.items()):
@@ -118,8 +118,12 @@ def calcola_e_plotta_evoluzione(esperimento_nome, prefisso_file, test_clean_X, t
             # Fissiamo l'asse X per rendere le barre comparabili visivamente tra i vari step
             axes[i].set_xlim(0, max_importanza_assoluta * 1.15) 
             
-        # Nasconde eventuali riquadri vuoti nella griglia
-        for j in range(i + 1, len(axes)):
+            # AGGIUNTA DELLA GRIGLIA VERTICALE (sotto le barre)
+            axes[i].set_axisbelow(True)
+            axes[i].xaxis.grid(True, linestyle='--', color='gray', alpha=0.7)
+            
+        # Nasconde eventuali riquadri vuoti (anche se con 6 grafici non ce ne saranno)
+        for j in range(len(importanza_per_step), len(axes)):
             fig.delaxes(axes[j])
             
         plt.suptitle(f'Evoluzione della Feature Importance\n{esperimento_nome}', fontsize=16, fontweight='bold', y=1.02)
