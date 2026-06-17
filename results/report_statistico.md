@@ -53,3 +53,15 @@ Abbiamo alterato intenzionalmente la colonna `winner_age` inserendo dei valori d
 Lo stress test ha dimostrato che la logica di iniezione dell'anomalia agisce "a monte" troncando i dataset in modo uniforme (l'impatto resta costante all'8.03% di righe perse su tutte le percentuali).
 
 Questo comportamento costante evidenzia che l'esperimento ha creato un caso di studio ideale: un'architettura dati non presidiata avrebbe digerito questi file distorti corrompendo i report aziendali. Come contromisura ingegneristica basata sui risultati di questo test, si giustifica la necessità di implementare dei **Data Contracts rigidi (es. via PyDeequ)** in grado di bloccare la pipeline (Circuit Breaker) non appena lo schema o le metriche chiave deviano dai valori del dataset di controllo.
+
+---
+
+## 1.5 Analisi dei Risultati della Coerenza
+
+Per completare la valutazione della pipeline abbiamo eseguito anche l'esperimento di **coerenza**, generando due famiglie di dataset sporchi a partire da `dataset_ml_ready.csv`: il caso di **Target Flipping** e quello di **Elo vs Ranking**. La baseline del modello, calcolata sul dataset pulito, si attesta a **0.6509** di accuracy test.
+
+I risultati mostrano due comportamenti distinti. Nel caso di **Target Flipping**, l'accuracy rimane sostanzialmente stabile ai livelli più bassi di degrado, con valori di **0.6513** al 10% e **0.6488** al 20%, quindi vicini alla baseline. Quando il rumore sale al 40%, la metrica scende a **0.6371**, mentre al 60% e 80% il modello collassa in modo netto fino a **0.3659** e **0.3508**. Questo indica che una quota elevata di etichette invertite rende il problema non più apprendibile in modo affidabile. Anche la confidenza media cala nelle fasi intermedie e il gap tra train e test segnala una perdita di generalizzazione.
+
+Nel caso **Elo vs Ranking**, invece, l'impatto è molto più contenuto: l'accuracy test resta sempre compresa tra **0.6414** e **0.6507**, quindi prossima alla baseline in tutte le condizioni. La distanza tra train e test rimane stabile, con train accuracy attorno a **0.685-0.688**, segno che la perturbazione sul segnale di ranking non basta a destabilizzare in modo significativo il classificatore. Anche confidenza e tempi di addestramento restano quasi invariati, confermando che questa anomalia è meno distruttiva della manipolazione diretta del target.
+
+In sintesi, l'esperimento evidenzia che il modello è molto sensibile alla corruzione dell'etichetta, mentre tollera meglio la contraddizione sulle feature di ranking. Questo risultato è utile per la relazione perché mostra che i controlli di qualità non devono limitarsi alla coerenza sintattica del dataset, ma devono presidiare soprattutto l'integrità semantica del target e delle relazioni tra variabili. Le tabelle e gli HTML di confronto prodotti in `results/` confermano il comportamento osservato e possono essere richiamati come evidenza sperimentale nella discussione finale.
