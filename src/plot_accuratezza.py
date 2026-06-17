@@ -14,7 +14,7 @@ plots_dir = os.path.join(results_dir, "plots")
 os.makedirs(plots_dir, exist_ok=True) # Crea la cartella se non esiste
 
 path_json = os.path.join(results_dir, "risultati_accuratezza.json")
-path_json_base = os.path.join(src_dir, "baseline_metrics.json")
+path_json_base = os.path.join(results_dir, "baseline_metrics.json") # Assicurati che punti a results_dir
 
 if not os.path.exists(path_json):
     print(f"[ERRORE] File dei dati non trovato in: {path_json}")
@@ -35,7 +35,10 @@ with open(path_json, "r") as f:
 with open(path_json_base, "r") as f:
     dati_base = json.load(f)
 
-baseline_acc = dati["baseline_acc"]
+# PRELIEVO METRICHE MEDIATE DALLA BASELINE A 10 RUN
+baseline_acc = dati_base["accuracy"]
+baseline_conf = dati_base["confidenza"] * 100
+baseline_time = dati_base["time"]
 cm_baseline = dati_base["cm"] # Matrice di confusione base (0%)
 
 percentuali = dati["percentuali"]
@@ -102,7 +105,9 @@ plt.savefig(os.path.join(plots_dir, "accuratezza_02_train_test_gap.png"), dpi=30
 plt.figure(figsize=(10, 5))
 plt.plot(perc_labels, [c * 100 for c in risultati['Rumore_Gaussiano']['confidenza']], label='Rumore Gaussiano', color='purple', marker='o', linewidth=2.5)
 plt.plot(perc_labels, [c * 100 for c in risultati['Outliers']['confidenza']], label='Outliers', color='teal', marker='s', linewidth=2.5)
-plt.axhline(y=70.0, color='gray', linestyle='--', label='Soglia Teorica di Rischio (70%)')
+
+# LINEA DELLA BASELINE AL POSTO DEL 70% FISSO
+plt.axhline(y=baseline_conf, color='gray', linestyle='--', linewidth=2, label=f'Baseline ({baseline_conf:.1f}%)')
 
 plt.title('Il Crollo delle Certezze: Confidenza Predittiva', fontsize=14, fontweight='bold')
 plt.xlabel('Percentuale di record corrotti (%)')
@@ -116,6 +121,9 @@ plt.savefig(os.path.join(plots_dir, "accuratezza_03_confidenza.png"), dpi=300)
 plt.figure(figsize=(10, 5))
 plt.plot(perc_labels, risultati['Rumore_Gaussiano']['tempi'], label='Rumore Gaussiano', color='orange', marker='o', linewidth=2.5)
 plt.plot(perc_labels, risultati['Outliers']['tempi'], label='Outliers', color='blue', marker='s', linewidth=2.5)
+
+# LINEA DELLA BASELINE DEI TEMPI
+plt.axhline(y=baseline_time, color='gray', linestyle='--', linewidth=2, label=f'Baseline ({baseline_time:.1f} s)')
 
 plt.title('Impatto Computazionale: Tempi di Addestramento', fontsize=14, fontweight='bold')
 plt.xlabel('Percentuale di record corrotti (%)')
@@ -166,4 +174,4 @@ plot_matrici_confusione('Outliers', 'Outliers', 'Greens', "accuratezza_05_matric
 # Genera la griglia per Rumore Gaussiano (in blu)
 plot_matrici_confusione('Rumore_Gaussiano', 'Rumore Gaussiano', 'Blues', "accuratezza_06_matrici_gaussiano.png", cm_baseline)
 
-print(f"Tutti i grafici sono stati generati e salvati in: {plots_dir}")
+print(f"Tutti i grafici di Accuratezza sono stati generati e salvati in: {plots_dir}")

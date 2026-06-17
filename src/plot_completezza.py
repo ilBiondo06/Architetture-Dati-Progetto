@@ -14,7 +14,7 @@ plots_dir = os.path.join(results_dir, "plots")
 os.makedirs(plots_dir, exist_ok=True) 
 
 path_json = os.path.join(results_dir, "risultati_completezza.json")
-path_json_base = os.path.join(src_dir, "baseline_metrics.json")
+path_json_base = os.path.join(results_dir, "baseline_metrics.json")
 
 if not os.path.exists(path_json):
     print(f"[ERRORE] File dei dati non trovato in: {path_json}")
@@ -35,12 +35,13 @@ with open(path_json, "r") as f:
 with open(path_json_base, "r") as f:
     dati_base = json.load(f)
 
-baseline_acc = dati["baseline_acc"]
+baseline_acc = dati_base["accuracy"]
 cm_baseline = dati_base["cm"] # Matrice di confusione base (0%)
-
+baseline_conf = dati_base["confidenza"] * 100
 percentuali = dati["percentuali"]
 perc_labels = [int(p * 100) for p in percentuali]
 risultati = dati["risultati"]
+baseline_time = dati_base["time"]
 
 sns.set_theme(style="whitegrid")
 
@@ -50,7 +51,7 @@ sns.set_theme(style="whitegrid")
 fig1, axes1 = plt.subplots(1, 2, figsize=(16, 6))
 
 axes1[0].errorbar(perc_labels, risultati['Systemic_Missing']['media'], yerr=risultati['Systemic_Missing']['std'], fmt='-o', label='Blackout (Completezza)', color='#d62728', capsize=5, linewidth=2.5)
-axes1[0].errorbar(perc_labels, risultati['Lag_10']['media'], yerr=risultati['Lag_10']['std'], fmt='-s', label='Lag-25 (Tempestività)', color='#ff7f0e', capsize=5, linewidth=2.5)
+axes1[0].errorbar(perc_labels, risultati['Lag_10']['media'], yerr=risultati['Lag_10']['std'], fmt='-s', label='Lag-10 (Tempestività)', color='#ff7f0e', capsize=5, linewidth=2.5)
 axes1[0].axhline(y=baseline_acc, color='gray', linestyle='--', linewidth=2, label=f'Baseline ({baseline_acc:.4f})')
 axes1[0].set_title('Completezza e Tempestività', fontsize=14, fontweight='bold')
 axes1[0].set_xlabel('Percentuale di record corrotti (%)')
@@ -64,7 +65,7 @@ x = np.arange(len(perc_labels))
 width = 0.35
 
 axes1[1].bar(x - width/2, delta_missing, width, label='Perdita Blackout', color='#d62728', alpha=0.85)
-axes1[1].bar(x + width/2, delta_lag, width, label='Perdita Lag-25', color='#ff7f0e', alpha=0.85)
+axes1[1].bar(x + width/2, delta_lag, width, label='Perdita Lag-10', color='#ff7f0e', alpha=0.85)
 axes1[1].set_title("Calo di Performance Netta (Delta %)", fontsize=14, fontweight='bold')
 axes1[1].set_xlabel('Percentuale di record corrotti (%)')
 axes1[1].set_ylabel('Perdita (%)')
@@ -85,7 +86,7 @@ plt.plot(perc_labels, risultati['Systemic_Missing']['media_train'], label='Train
 plt.plot(perc_labels, risultati['Systemic_Missing']['media'], label='Test (Blackout)', color='#d62728', marker='s', linewidth=2.5)
 plt.fill_between(perc_labels, risultati['Systemic_Missing']['media'], risultati['Systemic_Missing']['media_train'], color='#d62728', alpha=0.15)
 
-# Lag-25
+# Lag-10
 plt.plot(perc_labels, risultati['Lag_10']['media_train'], label='Train (Lag-10)', color='#ffbb78', marker='^', linewidth=2.5, linestyle='--')
 plt.plot(perc_labels, risultati['Lag_10']['media'], label='Test (Lag-10)', color='#ff7f0e', marker='D', linewidth=2.5)
 plt.fill_between(perc_labels, risultati['Lag_10']['media'], risultati['Lag_10']['media_train'], color='#ff7f0e', alpha=0.15)
@@ -102,7 +103,7 @@ plt.savefig(os.path.join(plots_dir, "completezza_02_train_test_gap.png"), dpi=30
 plt.figure(figsize=(10, 5))
 plt.plot(perc_labels, [c * 100 for c in risultati['Systemic_Missing']['confidenza']], label='Blackout', color='#d62728', marker='o', linewidth=2.5)
 plt.plot(perc_labels, [c * 100 for c in risultati['Lag_10']['confidenza']], label='Lag-10', color='#ff7f0e', marker='s', linewidth=2.5)
-plt.axhline(y=70.0, color='gray', linestyle='--', label='Soglia Teorica di Rischio (70%)')
+plt.axhline(y=baseline_conf, color='gray', linestyle='--', label=f'Baseline ({baseline_conf:.2f}%)')
 
 plt.title('Il Crollo delle Certezze: Confidenza Predittiva', fontsize=14, fontweight='bold')
 plt.xlabel('Percentuale di record corrotti (%)')
@@ -116,7 +117,7 @@ plt.savefig(os.path.join(plots_dir, "completezza_03_confidenza.png"), dpi=300)
 plt.figure(figsize=(10, 5))
 plt.plot(perc_labels, risultati['Systemic_Missing']['tempi'], label='Blackout', color='#d62728', marker='o', linewidth=2.5)
 plt.plot(perc_labels, risultati['Lag_10']['tempi'], label='Lag-10', color='#ff7f0e', marker='s', linewidth=2.5)
-
+plt.axhline(y=baseline_time, color='gray', linestyle='--', linewidth=2, label=f'Baseline ({baseline_time:.1f} s)')
 plt.title('Impatto Computazionale: Tempi di Addestramento', fontsize=14, fontweight='bold')
 plt.xlabel('Percentuale di record corrotti (%)')
 plt.ylabel('Tempo impiegato (secondi)')
