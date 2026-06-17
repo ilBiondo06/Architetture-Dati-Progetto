@@ -39,13 +39,15 @@ def safe_mean(df, column_name):
 # ==========================================
 print("Caricamento dataset Cleaned di base per l'analisi di coerenza...")
 df_originale = pd.read_csv(percorso_originale)
+df_originale["tourney_date"] = pd.to_datetime(df_originale["tourney_date"])
+df_originale = df_originale[df_originale["tourney_date"].dt.year <= 2022].copy()
 colonne_clean = set(df_originale.columns)
 
 target_mean_clean = safe_mean(df_originale, "target")
 rank_diff_mean_clean = safe_mean(df_originale, "ATP_RANK_DIFF")
 
 print("Generazione del report per il dataset Cleaned di riferimento...")
-report_originale = ProfileReport(df_originale, title="Dataset Cleaned (Base)", progress_bar=False)
+report_originale = ProfileReport(df_originale, title="Dataset Cleaned (Base)", progress_bar=False, minimal=True)
 
 description_clean = report_originale.get_description()
 info_clean = description_clean.table
@@ -92,7 +94,7 @@ for file_name in file_sporchi:
     if rank_diff_mean_clean is not None and rank_diff_mean_dirty is not None:
         shift_rank = round(rank_diff_mean_dirty - rank_diff_mean_clean, 4)
     
-    report_modificato = ProfileReport(df_modificato, title=f"Dataset Dirty ({file_name})", progress_bar=False)
+    report_modificato = ProfileReport(df_modificato, title=f"Dataset Dirty ({file_name})", progress_bar=False, minimal=True)
     info_dirty = report_modificato.get_description().table
     n_righe_dirty = info_dirty.get("n_records", info_dirty.get("n")) if isinstance(info_dirty, dict) else getattr(info_dirty, "n_records", getattr(info_dirty, "n", 0))
     

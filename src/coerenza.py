@@ -62,8 +62,8 @@ if __name__ == "__main__":
     
     # 3. Struttura dati arricchita
     risultati = {
-        'Target_Flipping': {'media': [], 'std': [], 'media_train': [], 'confidenza': [], 'tempi': [], 'cm_per_step': {}},
-        'Elo_Ranking': {'media': [], 'std': [], 'media_train': [], 'confidenza': [], 'tempi': [], 'cm_per_step': {}}
+        'Target_Flipping': {'media': [], 'std': [], 'media_train': [], 'confidenza': [], 'tempi': [], 'cm_per_step': {}, 'p1_win_pct': [], 'p2_win_pct': []},
+        'Elo_Ranking': {'media': [], 'std': [], 'media_train': [], 'confidenza': [], 'tempi': [], 'cm_per_step': {}, 'p1_win_pct': [], 'p2_win_pct': []}
     }
     
     # --------------------------------
@@ -100,6 +100,8 @@ if __name__ == "__main__":
         risultati['Target_Flipping']['media_train'].append(float(np.mean(r_acc_train)))
         risultati['Target_Flipping']['confidenza'].append(float(np.mean(r_conf)))
         risultati['Target_Flipping']['tempi'].append(float(np.mean(r_time)))
+        risultati['Target_Flipping']['p1_win_pct'].append(float((y_stale == 1).mean() * 100))
+        risultati['Target_Flipping']['p2_win_pct'].append(float((y_stale == 0).mean() * 100))
 
     # -----------------------------------------
     # ESPERIMENTO B: CONTRADDIZIONE DOMINIO 
@@ -132,6 +134,8 @@ if __name__ == "__main__":
         risultati['Elo_Ranking']['media_train'].append(float(np.mean(r_acc_train)))
         risultati['Elo_Ranking']['confidenza'].append(float(np.mean(r_conf)))
         risultati['Elo_Ranking']['tempi'].append(float(np.mean(r_time)))
+        risultati['Elo_Ranking']['p1_win_pct'].append(float((y_train_clean == 1).mean() * 100))
+        risultati['Elo_Ranking']['p2_win_pct'].append(float((y_train_clean == 0).mean() * 100))
 
     # ==========================================
     # SALVATAGGIO JSON
