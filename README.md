@@ -2,8 +2,8 @@ Questo progetto esplora l'impatto della Data Quality sulle performance di un Mul
 
 MEMBRI DEL GRUPPO
 - Baiardi Davide 894430
-- Passarelli Beatrice 
-- Brandino Alessandro 
+- Passarelli Beatrice 949808
+- Brandino Alessandro 899652
 
 per l'esecuzione di qualsiasi script è necessario spostarsi nella cartella /src del progetto, in ordine sono stati eseguiti gli script:
 
